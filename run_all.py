@@ -94,9 +94,9 @@ def main():
     try:
         front_proc = subprocess.Popen(frontend_cmd, cwd=PROJECT_ROOT / "trip-frontend")
     except FileNotFoundError:
-        print("❌ Impossible de lancer le frontend : 'npm' non trouvé.")
-        print("   → Vérifie que Node.js / npm sont installés et accessibles dans le PATH.")
-        print("   → Tu peux aussi aller dans trip-frontend et lancer: npm run dev")
+        print("'npm' non trouvé.")
+        print("   Node.js / npm sont installés et accessibles dans le PATH ?")
+        print("   trip-frontend et lancer: npm run dev")
         front_proc = None
 
     try:
