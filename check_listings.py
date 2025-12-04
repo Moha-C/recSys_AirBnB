@@ -16,7 +16,7 @@ if "price" in df.columns:
     print("\nUnique price examples:")
     print(df["price"].dropna().astype(str).head(20))
 else:
-    print("\n⚠️ No 'price' column found!!")
+    print("\nNo 'price' column found!!")
 
 import pandas as pd
 from pathlib import Path
