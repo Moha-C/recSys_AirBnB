@@ -9,7 +9,7 @@ from torch import nn
 @dataclass
 class ModelConfig:
     embedding_dim: int = 384  # dim de all-MiniLM-L6-v2
-    alpha_text: float = 0.7   # pondération texte vs image
+    alpha_text: float = 0.4   # pondération texte vs image
     use_image: bool = False   # True plus tard
 
 
