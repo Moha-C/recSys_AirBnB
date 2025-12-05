@@ -147,17 +147,31 @@ def main(args):
     emb_np = np.load(FUSED_EMB_NPY)  # shape [N_items, dim]
     item_emb = torch.from_numpy(emb_np).float().to(device)
 
-    # On suppose que l'ordre des lignes dans emb_item_fused.npy
-    # correspond à l'ordre de listings_v1
-    item_ids = listings["id"].astype(int).tolist()
-    item_id_to_idx = {iid: i for i, iid in enumerate(item_ids)}
+    # On ALIGNE strictement les ids avec les embeddings :
+    # emb_np.shape[0] = nombre réel d'items encodés par CLIP
+    n_items = emb_np.shape[0]
+
+    # On prend seulement les n_items premiers listings, dans le même ordre
+    all_item_ids = listings["id"].astype(int).tolist()
+    if n_items > len(all_item_ids):
+        raise ValueError(
+            f"Plus d'embeddings ({n_items}) que de lignes dans listings_v1 ({len(all_item_ids)})."
+        )
+
+    item_ids = all_item_ids[:n_items]
+    item_id_to_idx = {int(iid): idx for idx, iid in enumerate(item_ids)}
+
 
     print("=== Loading interactions (reviews + logs) ===")
     interactions = load_interactions(args.use_logs)
 
+    # on force item_id en int pour être cohérent avec le mapping
+    interactions["item_id"] = interactions["item_id"].astype(int)
+
     # On ne garde que les interactions dont l'item a un embedding
     interactions = interactions[interactions["item_id"].isin(item_id_to_idx.keys())]
     print(f"Interactions after filtering to items with embeddings: {len(interactions)}")
+
 
     if len(interactions) == 0:
         raise ValueError("No interactions left after filtering on item_id -> embeddings.")
@@ -188,19 +202,23 @@ def main(args):
     for epoch in range(args.epochs):
         model.train()
         epoch_losses = []
-
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{args.epochs}"):
             user_ids, pos_ids, neg_ids = batch
             user_ids = user_ids.tolist()
             pos_ids = pos_ids.tolist()
             neg_ids = neg_ids.tolist()
 
-            # Map item_id -> index dans emb_item_fused
-            pos_idx = [item_id_to_idx[int(i)] for i in pos_ids]
-            neg_idx = [item_id_to_idx[int(i)] for i in neg_ids]
+            # Map item_id -> index dans emb_item_fused, en filtrant les ids inconnus
+            pos_idx = [item_id_to_idx[int(i)] for i in pos_ids if int(i) in item_id_to_idx]
+            neg_idx = [item_id_to_idx[int(i)] for i in neg_ids if int(i) in item_id_to_idx]
+
+            # Si après filtrage on n'a plus rien de valable, on skip ce batch
+            if not pos_idx or not neg_idx:
+                continue
 
             pos_emb = item_emb[pos_idx]  # [B, dim]
             neg_emb = item_emb[neg_idx]  # [B, dim]
+
 
             # user embedding = moyenne des items vus (dans le dataset)
             user_emb_list = []
