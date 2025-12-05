@@ -6,7 +6,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent
 
 
-def run_step(cmd, title):
+def run_step(cmd, title: str) -> None:
     print("\n" + "=" * 80)
     print(f"STEP: {title}")
     print("COMMAND:", " ".join(str(c) for c in cmd))
@@ -14,14 +14,19 @@ def run_step(cmd, title):
     r = subprocess.run(cmd, cwd=PROJECT_ROOT)
     if r.returncode != 0:
         print(f"❌ Step failed: {title}")
-        sys.exit(r.returncode)
-    print(f"✅ Step completed: {title}")
+    else:
+        print(f"Step completed: {title}")
 
 
-def main():
-    python = sys.executable
+def main() -> None:
+    # On essaie d'abord le python du venv local, sinon on prend sys.executable
+    venv_python = PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
+    if venv_python.exists():
+        python = str(venv_python)
+    else:
+        python = sys.executable
 
-    # Offline eval
+    # 1) Offline eval : on force l'utilisation des LOGS agrégés (interactions_agg.parquet)
     run_step(
         [
             python,
@@ -31,22 +36,23 @@ def main():
             "all",
             "--k_eval",
             "10",
+            "--use_logs",
+            "1",
         ],
-        "Offline evaluation (all modes)",
+        "Offline evaluation (all modes, using LOGS)",
     )
 
-    # Aggregate logs
-# Aggregate logs
+    # 2) Agrégation des logs UI -> interactions_agg.parquet
     run_step(
         [
             python,
             "-m",
             "src.training.aggregate_logs",
         ],
-        "Aggregate logs into interactions_from_logs.parquet",
+        "Aggregate logs into interactions_agg.parquet",
     )
 
-    # Train multimodal model
+    # 3) Entraînement du modèle multimodal à partir des logs
     run_step(
         [
             python,
@@ -55,7 +61,7 @@ def main():
             "--use_logs",
             "1",
         ],
-        "Train multimodal model from interactions (reviews + logs)",
+        "Train multimodal model from interactions (logs)",
     )
 
 
