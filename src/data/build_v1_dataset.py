@@ -529,14 +529,20 @@ def build_interactions(listings_v1: pd.DataFrame, cities: List[str]) -> pd.DataF
 
     # user_id
 # user_id
+# user_id
     if "reviewer_id" in reviews.columns:
         reviews["user_id"] = reviews["reviewer_id"]
     elif "reviewer_name" in reviews.columns:
         print("WARNING: using reviewer_name as proxy for user_id.")
-        reviews["user_id"] = reviews["reviewer_name"].astype("category").cat.codes + 1
+        reviews["user_id"] = (
+            reviews["reviewer_name"]
+            .astype("category")
+            .cat.codes.astype(int) + 1
+        )
     else:
         print("WARNING: no reviewer_id/reviewer_name – synthetic user_id from index.")
         reviews["user_id"] = reviews.index.astype(int) + 1
+
 
 
     # item_id
