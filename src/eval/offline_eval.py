@@ -18,7 +18,13 @@ from src.config import (
 from src.eval.metrics import ndcg_at_k, recall_at_k, coverage
 from src.models.rerank import ContextualReranker
 
-
+from src.config import (
+    INTERACTIONS_V1,
+    LISTINGS_V1,
+    DATA_PROCESSED_DIR,
+    EXPERIMENTS_DIR,
+    AGG_LOGS_PATH,
+)
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -40,7 +46,17 @@ def parse_args():
         default=200,
         help="Nombre de candidats récupérés avant re-ranking.",
     )
+    parser.add_argument(
+        "--use_logs",
+        type=int,
+        default=0,
+        help=(
+            "1 = utiliser interactions_agg.parquet (logs UI) "
+            "au lieu de interactions_v1.parquet"
+        ),
+    )
     return parser.parse_args()
+
 
 
 def load_embeddings() -> Dict[str, np.ndarray]:
@@ -140,17 +156,19 @@ def retrieval_mode_eval(
         cand_ids = item_ids[idx]
 
         if reranker is not None:
-            ranked = reranker.rerank(
+            new_ids, new_scores = reranker.rerank(
                 candidate_ids=cand_ids,
                 base_scores=scores,
                 budget_min=None,
                 budget_max=None,
                 n_guests=None,
-                k_final=k_eval,
+                k=k_eval,  # <-- ici on passe k, plus k_final
             )
-            recs = [lid for lid, _ in ranked]
+            recs = new_ids
         else:
             recs = cand_ids[:k_eval].tolist()
+
+
 
         all_recs[uid] = recs
         gt = user_truth[uid]
@@ -164,14 +182,24 @@ def retrieval_mode_eval(
     }
     return metrics
 
-
 def main(args):
     EXPERIMENTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    interactions = pd.read_parquet(INTERACTIONS_V1)
+    # Choix de la source d'interactions :
+    # - INTERACTIONS_V1 = reviews Airbnb (anonymisés)
+    # - AGG_LOGS_PATH = logs agrégés de TON interface (users réels)
+    if getattr(args, "use_logs", 0):
+        interactions_path = AGG_LOGS_PATH
+        print(f"=== Using LOGS interactions from {interactions_path} ===")
+    else:
+        interactions_path = INTERACTIONS_V1
+        print(f"=== Using REVIEWS interactions from {interactions_path} ===")
+
+    interactions = pd.read_parquet(interactions_path)
     listings = pd.read_parquet(LISTINGS_V1)
 
     train, test = build_leave_one_out(interactions)
+
 
     emb_data = load_embeddings()
     item_ids = emb_data["item_ids"]
