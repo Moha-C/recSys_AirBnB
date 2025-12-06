@@ -17,3 +17,4 @@ geopandas
 shapely
 matplotlib
 tqdm
+xgboost
